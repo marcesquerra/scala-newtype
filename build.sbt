@@ -22,7 +22,9 @@ lazy val newtype = crossProject(JSPlatform, JVMPlatform, NativePlatform).in(file
     crossScalaVersions := List("2.11.12"),
     scalaVersion := "2.11.12",
     nativeLinkStubs := true,
-    Compile / scalacOptions += "-Yno-predef" // needed to ensure users can use -Yno-predef
+    Compile / scalacOptions += "-Yno-predef", // needed to ensure users can use -Yno-predef
+    sources in (Compile,doc) := Seq.empty,
+    publishArtifact in (Compile, packageDoc) := false
   )
 
 lazy val newtypeJVM = newtype.jvm
