@@ -1,6 +1,13 @@
 import ReleaseTransformations._
 import sbtcrossproject.CrossPlugin.autoImport.crossProject
 
+lazy val scala213 = "2.13.1"
+lazy val scala212 = "2.12.10"
+lazy val scala211 = "2.11.12"
+
+lazy val allScalaVersions = List(scala213, scala212, scala211)
+lazy val nativeScalaVersions = List(scala211)
+
 organization in ThisBuild := "io.estatico"
 
 lazy val root = project.in(file("."))
@@ -8,8 +15,8 @@ lazy val root = project.in(file("."))
   .settings(noPublishSettings)
 
 lazy val newtype = crossProject(JSPlatform, JVMPlatform, NativePlatform).in(file("."))
+  .enablePlugins(GitVersioning)
   .settings(defaultSettings)
-  .settings(releasePublishSettings)
   .settings(name := "newtype")
   .nativeSettings(
     crossScalaVersions := List("2.11.12"),
@@ -41,35 +48,15 @@ lazy val noPublishSettings = Seq(
   publishArtifact := false
 )
 
-lazy val releasePublishSettings = Seq(
-  releaseCrossBuild := true,
-  releasePublishArtifactsAction := PgpKeys.publishSigned.value,
-  releaseProcess := Seq[ReleaseStep](
-    checkSnapshotDependencies,
-    inquireVersions,
-    runClean,
-    runTest,
-    setReleaseVersion,
-    commitReleaseVersion,
-    tagRelease,
-    publishArtifacts,
-    setNextVersion,
-    commitNextVersion,
-    ReleaseStep(action = Command.process("sonatypeReleaseAll", _)),
-    pushChanges
-  ),
-  homepage := Some(url("https://github.com/estatico/scala-newtype")),
-  licenses := Seq("Apache 2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
-  publishMavenStyle := true,
-  publishArtifact in Test := false,
-  pomIncludeRepository := { _ => false },
-  publishTo in ThisBuild := {
-    val nexus = "https://oss.sonatype.org/"
-    if (isSnapshot.value)
-      Some("snapshots" at nexus + "content/repositories/snapshots")
+lazy val defaultSettings = Seq(
+  crossScalaVersions := {
+    if (crossProjectPlatform.value == NativePlatform)
+      nativeScalaVersions
     else
-      Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+      allScalaVersions
   },
+  homepage := Some(url("https://github.com/estatico/scala-newtype")),
+  licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
   scmInfo := Some(
     ScmInfo(
       url("https://github.com/estatico/scala-newtype"),
@@ -79,21 +66,7 @@ lazy val releasePublishSettings = Seq(
   developers := List(
     Developer("caryrobbins", "Cary Robbins", "carymrobbins@gmail.com", url("http://caryrobbins.com"))
   ),
-
-  credentials ++= (
-    for {
-      username <- Option(System.getenv().get("SONATYPE_USERNAME"))
-      password <- Option(System.getenv().get("SONATYPE_PASSWORD"))
-    } yield Credentials(
-      "Sonatype Nexus Repository Manager",
-      "oss.sonatype.org",
-      username,
-      password
-    )
-  ).toSeq
-)
-
-lazy val defaultSettings = Seq(
+  publishMavenStyle := true,
   defaultScalacOptions,
   scalacOptions ++= PartialFunction.condOpt(CrossVersion.partialVersion(scalaVersion.value)) {
     case Some((2, n)) if n >= 13 =>
@@ -101,6 +74,10 @@ lazy val defaultSettings = Seq(
         "-Ymacro-annotations"
       )
   }.toList.flatten,
+  bintrayRepository := "jude",
+  bintrayOrganization := Some("bryghts"),
+  git.useGitDescribe := true,
+  git.formattedShaVersion := git.gitHeadCommit.value map { sha => s"v${sha.take(5).toUpperCase}" },
   defaultLibraryDependencies,
   libraryDependencies ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
