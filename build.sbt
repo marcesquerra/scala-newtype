@@ -4,15 +4,22 @@ import sbtcrossproject.CrossPlugin.autoImport.crossProject
 organization in ThisBuild := "io.estatico"
 
 lazy val root = project.in(file("."))
-  .aggregate(newtypeJS, newtypeJVM, catsTestsJVM, catsTestsJS)
+  .aggregate(newtypeJS, newtypeJVM, newtypeNative, catsTestsJVM, catsTestsJS)
   .settings(noPublishSettings)
 
-lazy val newtype = crossProject(JSPlatform, JVMPlatform).in(file("."))
+lazy val newtype = crossProject(JSPlatform, JVMPlatform, NativePlatform).in(file("."))
   .settings(defaultSettings)
   .settings(releasePublishSettings)
   .settings(name := "newtype")
+  .nativeSettings(
+    crossScalaVersions := List("2.11.12"),
+    scalaVersion := "2.11.12",
+    nativeLinkStubs := true,
+    Compile / scalacOptions += "-Yno-predef" // needed to ensure users can use -Yno-predef
+  )
 
 lazy val newtypeJVM = newtype.jvm
+lazy val newtypeNative = newtype.native
 lazy val newtypeJS = newtype.js
 
 lazy val catsTests = crossProject(JSPlatform, JVMPlatform).in(file("cats-tests"))
@@ -111,7 +118,6 @@ lazy val defaultSettings = Seq(
 
 lazy val defaultScalacOptions = scalacOptions ++= Seq(
   "-Xfatal-warnings",
-  "-Yno-predef", // needed to ensure users can use -Yno-predef
   "-unchecked",
   "-feature",
   "-deprecation",
@@ -124,11 +130,17 @@ lazy val defaultScalacOptions = scalacOptions ++= Seq(
   case _ =>
     // on scala 2.12+ some spurious unused warnings get triggered
     Seq("-Xlint:-unused,_")
-})
+}) ++ (if (crossProjectPlatform.value == NativePlatform)
+    Seq() // Removing the 'predef' on scala native-tests, breaks the test integration with sbt
+  else
+    Seq("-Yno-predef")) // needed to ensure users can use -Yno-predef
 
 lazy val defaultLibraryDependencies = libraryDependencies ++= Seq(
   scalaOrganization.value % "scala-reflect" % scalaVersion.value % Provided,
   scalaOrganization.value % "scala-compiler" % scalaVersion.value % Provided,
-  "org.scalacheck" %%% "scalacheck" % "1.14.0" % Test,
-  "org.scalatest" %%% "scalatest" % "3.0.8" % Test
+  "org.scalacheck" %%% "scalacheck" % "1.14.3" % Test,
+  "org.scalatest" %%% "scalatest" % "3.2.0-M4" % Test,
+  "org.scalatestplus" %%% "scalacheck-1-14" % "3.2.0.0-M4" % Test
 )
+
+
